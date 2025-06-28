@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socio Estratégico de Contenido</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+            color: #F9FAFB;
+        }
+        .control-btn, .suggestion-btn {
+            transition: all 0.2s ease-in-out;
+            border: 1px solid #374151;
+        }
+        .control-btn.selected {
+            background-color: #3B82F6;
+            color: #FFFFFF;
+            border-color: #3B82F6;
+            transform: scale(1.05);
+        }
+        .suggestion-btn:hover {
+            background-color: #374151;
+            border-color: #4B5563;
+            transform: translateY(-2px);
+        }
+        .card {
+            background-color: #1F2937;
+            border: 1px solid #374151;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            transition: transform 0.2s ease-in-out;
+        }
+        .copy-btn, .action-btn {
+            background-color: #374151;
+            color: #D1D5DB;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            font-size: 0.875rem;
+        }
+        .copy-btn:hover, .action-btn:hover {
+            background-color: #4B5563;
+        }
+        #results-container {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.5s ease, transform 0.5s ease;
+        }
+        #results-container.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .loader {
+            border: 4px solid #4B5563;
+            border-top: 4px solid #3B82F6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .activity-panel {
+            background-color: #1F2937;
+            border: 1px solid #374151;
+            padding: 1rem;
+            border-radius: 0.75rem;
+        }
+        .thread-list { list-style: none; padding-left: 0; }
+        .thread-list li { position: relative; padding-left: 2.5rem; margin-bottom: 1rem; }
+        .thread-list li::before {
+            content: attr(data-counter);
+            position: absolute; left: 0; top: 0;
+            background-color: #374151; color: #9CA3AF;
+            border-radius: 50%; width: 1.75rem; height: 1.75rem;
+            text-align: center; line-height: 1.75rem;
+            font-weight: 600; font-size: 0.8rem;
+        }
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            display: flex; justify-content: center; align-items: center;
+            opacity: 0; visibility: hidden; transition: opacity 0.3s, visibility 0.3s; z-index: 1000;
+        }
+        .modal.visible { opacity: 1; visibility: visible; }
+        .modal-content {
+            background-color: #1F2937; border-radius: 0.75rem;
+            padding: 2rem; width: 90%; max-width: 600px;
+            transform: scale(0.95); transition: transform 0.3s;
+        }
+        .modal.visible .modal-content { transform: scale(1); }
+        .info-box {
+            background-color: #111827; border: 1px dashed #374151;
+            padding: 1rem; margin-top: 1rem; border-radius: 0.5rem;
+            font-size: 0.9rem; color: #D1D5DB;
+        }
+        .image-upload-box {
+            border: 2px dashed #374151;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            position: relative;
+        }
+        .image-upload-box:hover {
+            border-color: #4B5563;
+        }
+        .image-preview-container {
+            position: relative;
+        }
+        .image-preview {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 0.5rem;
+        }
+        .delete-image-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background-color: rgba(17, 24, 39, 0.7);
+            color: white;
+            border: none;
+            border-radius: 9999px;
+            width: 1.75rem;
+            height: 1.75rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            line-height: 1;
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="max-w-4xl mx-auto p-4 md:p-8">
+
+        <div class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-white mb-2">Socio Estratégico de Contenido</h1>
+            <p class="text-lg text-gray-400">De la Generación a la Estrategia Inteligente</p>
+        </div>
+        
+        <!-- Daily Activity Panel -->
+        <div class="activity-panel mb-8">
+             <div class="flex justify-between items-center mb-4">
+                 <h2 class="text-xl font-bold text-white">Panel de Actividad Diaria</h2>
+                 <button id="reset-activity-btn" class="action-btn !bg-red-800/50 hover:!bg-red-800/80 text-sm" disabled>Reiniciar</button>
+             </div>
+             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                 <div>
+                     <p class="text-gray-400 text-sm">Tweets / Hilos</p>
+                     <p class="text-2xl font-semibold"><span id="tweets-count">0</span> / 500</p>
+                     <button class="action-btn w-full mt-2" data-activity="tweets" disabled>+</button>
+                 </div>
+                 <div>
+                     <p class="text-gray-400 text-sm">Replies</p>
+                     <p class="text-2xl font-semibold"><span id="replies-count">0</span></p>
+                     <button class="action-btn w-full mt-2" data-activity="replies" disabled>+</button>
+                 </div>
+                 <div>
+                     <p class="text-gray-400 text-sm">Follows</p>
+                     <p class="text-2xl font-semibold"><span id="follows-count">0</span> / 400</p>
+                      <button class="action-btn w-full mt-2" data-activity="follows" disabled>+</button>
+                 </div>
+                 <div>
+                     <p class="text-gray-400 text-sm">Likes</p>
+                     <p class="text-2xl font-semibold"><span id="likes-count">0</span></p>
+                      <button class="action-btn w-full mt-2" data-activity="likes" disabled>+</button>
+                 </div>
+             </div>
+        </div>
+
+        <div id="main-content" class="space-y-8">
+            <!-- UI controls will be dynamically injected here -->
+        </div>
+
+        <div class="text-center my-8">
+            <button id="generate-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 transform hover:scale-105">
+                Generar Opciones
+            </button>
+        </div>
+        
+        <div id="error-message" class="hidden text-center text-red-400 p-4 mb-6 bg-red-900/50 rounded-lg"></div>
+        <div id="loading-spinner" class="hidden justify-center items-center my-8"><div class="loader"></div></div>
+        <div id="results-container" class="space-y-6"></div>
+    </div>
+    
+    <div id="adapt-modal" class="modal">
+         <div class="modal-content">
+            <div class="flex justify-between items-center mb-4"><h3 class="text-xl font-bold text-white">Adaptar Contenido</h3><button id="close-modal-btn" class="text-gray-400 hover:text-white">&times;</button></div>
+            <p class="text-gray-400 mb-4">Transforma esta idea para otras plataformas con un solo clic.</p>
+            <div class="flex gap-4 mb-4"><button class="action-btn flex-1" data-platform="LinkedIn">LinkedIn Post</button><button class="action-btn flex-1" data-platform="Blog Idea">Blog Idea</button></div>
+            <div id="adapted-content-area" class="w-full p-4 bg-gray-900 border border-gray-700 rounded-lg min-h-[150px] whitespace-pre-wrap"></div>
+            <div id="modal-loader" class="hidden justify-center items-center my-4"><div class="loader"></div></div>
+        </div>
+    </div>
+    
+    <script type="module">
+        // Firebase and App Logic
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        
+        const mainContentUI = `
+            <div>
+                <label class="block text-lg font-semibold text-gray-300 mb-3">1. Elige el Contexto</label>
+                <div id="context-options" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+                    <button class="control-btn p-3 bg-gray-800 rounded-lg font-medium" data-context="Reply">Reply</button>
+                    <button class="control-btn p-3 bg-gray-800 rounded-lg font-medium" data-context="Full Thread">Thread</button>
+                    <button class="control-btn p-3 bg-gray-800 rounded-lg font-medium" data-context="Micro-Tutorial">Micro-Tutorial</button>
+                    <button class="control-btn p-3 bg-gray-800 rounded-lg font-medium" data-context="Personal Reflection">Reflection</button>
+                    <button class="control-btn p-3 bg-gray-800 rounded-lg font-medium" data-context="Poll">Poll / Question</button>
+                    <button class="control-btn p-3 bg-gray-800 rounded-lg font-medium" data-context="Video Demo">Video Demo</button>
+                    <button class="control-btn p-3 bg-gray-800 rounded-lg font-medium" data-context="Image Analysis">Análisis de Imagen</button>
+                </div>
+                <input type="hidden" id="selected-context" value="">
+            </div>
+            <div>
+                 <label class="block text-lg font-semibold text-gray-300 mb-3">2. Ajusta el Tono</label>
+                <div id="tone-options" class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <button class="control-btn p-3 bg-gray-800 rounded-lg font-medium selected" data-tone="Founder-Designer (Balanced)">Founder-Designer</button>
+                    <button class="control-btn p-3 bg-gray-800 rounded-lg font-medium" data-tone="UX/UI Expert">Experto UX/UI</button>
+                    <button class="control-btn p-3 bg-gray-800 rounded-lg font-medium" data-tone="Founder Journey">Viaje del Founder</button>
+                    <button class="control-btn p-3 bg-gray-800 rounded-lg font-medium" data-tone="Social & Relatable">Social y Humano</button>
+                </div>
+                <input type="hidden" id="selected-tone" value="Founder-Designer (Balanced)">
+            </div>
+            <div id="input-section" class="space-y-6">
+                <div id="reply-inputs" class="hidden space-y-6">
+                    <div>
+                        <label for="reply-to-tweet" class="block text-lg font-semibold text-gray-300 mb-2">3. Tweet Original (al que respondes)</label>
+                        <textarea id="reply-to-tweet" rows="2" class="w-full p-4 bg-gray-900 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Pega aquí el texto del tweet..."></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-lg font-semibold text-gray-300 mb-2">Imagen del Tweet <span class="text-gray-400 font-normal">(Opcional)</span></label>
+                        <input type="file" id="reply-image-input" class="hidden" accept="image/*">
+                        <label for="reply-image-input" class="image-upload-box" id="reply-image-box">
+                             <div id="reply-image-preview-container" class="hidden image-preview-container">
+                                <img id="reply-image-preview" class="image-preview">
+                                <button type="button" class="delete-image-btn" data-statekey="reply">&times;</button>
+                            </div>
+                            <span id="reply-image-text">Pega una imagen o haz clic para subir</span>
+                        </label>
+                    </div>
+                     <div>
+                        <label for="reply-angle" class="block text-lg font-semibold text-gray-300 mb-2">4. Tu Ángulo para la Respuesta <span class="text-gray-400 font-normal">(Opcional)</span></label>
+                        <textarea id="reply-angle" rows="2" class="w-full p-4 bg-gray-900 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Añade tu perspectiva o haz clic en una sugerencia..."></textarea>
+                    </div>
+                    <div id="suggestion-section">
+                        <label class="block text-sm font-semibold text-gray-400 mb-3">Sugerencias del Framework:</label>
+                        <div id="suggestion-buttons" class="flex flex-wrap gap-2">
+                             <button class="suggestion-btn text-sm py-1 px-3 bg-gray-800 rounded-full" data-suggestion="El feedback es un regalo, no una crítica.">El feedback es un regalo</button>
+                             <button class="suggestion-btn text-sm py-1 px-3 bg-gray-800 rounded-full" data-suggestion="Se trata de progreso, no de perfección.">Progreso, no perfección</button>
+                             <button class="suggestion-btn text-sm py-1 px-3 bg-gray-800 rounded-full" data-suggestion="La dualidad de ser founder y diseñador al mismo tiempo.">Dualidad Founder-Designer</button>
+                        </div>
+                    </div>
+                </div>
+                 <div id="original-content-input" class="hidden">
+                    <label for="original-idea" class="block text-lg font-semibold text-gray-300 mb-2">3. Tu Idea Principal</label>
+                    <textarea id="original-idea" rows="4" class="w-full p-4 bg-gray-900 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Desarrolla aquí la idea principal..."></textarea>
+                </div>
+                <div id="image-analysis-inputs" class="hidden space-y-6">
+                    <div>
+                        <label for="image-question" class="block text-lg font-semibold text-gray-300 mb-2">3. Pregunta Original</label>
+                        <textarea id="image-question" rows="2" class="w-full p-4 bg-gray-900 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Ej: ¿Qué opción prefieren, A o B?"></textarea>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-lg font-semibold text-gray-300 mb-2">Imagen A</label>
+                            <input type="file" id="image-a-input" class="hidden" accept="image/*">
+                            <label for="image-a-input" class="image-upload-box" id="image-a-box">
+                                <div id="image-a-preview-container" class="hidden image-preview-container">
+                                    <img id="image-a-preview" class="image-preview">
+                                    <button type="button" class="delete-image-btn" data-statekey="a">&times;</button>
+                                </div>
+                                <span id="image-a-text">Pega una imagen o haz clic para subir</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="block text-lg font-semibold text-gray-300 mb-2">Imagen B</label>
+                            <input type="file" id="image-b-input" class="hidden" accept="image/*">
+                            <label for="image-b-input" class="image-upload-box" id="image-b-box">
+                                <div id="image-b-preview-container" class="hidden image-preview-container">
+                                    <img id="image-b-preview" class="image-preview">
+                                    <button type="button" class="delete-image-btn" data-statekey="b">&times;</button>
+                                </div>
+                                <span id="image-b-text">Pega una imagen o haz clic para subir</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="image-angle" class="block text-lg font-semibold text-gray-300 mb-2">4. Tu Ángulo <span class="text-gray-400 font-normal">(Opcional)</span></label>
+                        <textarea id="image-angle" rows="3" class="w-full p-4 bg-gray-900 border border-gray-700 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="Añade tu perspectiva o análisis experto..."></textarea>
+                    </div>
+                </div>
+            </div>`;
+        document.getElementById('main-content').innerHTML = mainContentUI;
+
+        // --- GLOBAL STATE & UTILITIES ---
+        let currentLanguage = 'English';
+        const imageState = { a: null, b: null, reply: null };
+        let db, auth, userId, activityDocRef;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        
+        function detectLanguage(text) {
+            const spanishChars = /[áéíóúñ¿¡]/;
+            return spanishChars.test(text.toLowerCase()) ? 'Spanish' : 'English';
+        }
+
+        function copyToClipboard(button, text) {
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            try { document.execCommand('copy'); button.textContent = '¡Copiado!'; setTimeout(() => { button.textContent = 'Copiar'; }, 2000); } 
+            catch (err) { console.error('No se pudo copiar el texto', err); button.textContent = 'Error'; }
+            document.body.removeChild(textArea);
+        }
+
+        async function callGenerativeAI(prompt, schema, images = []) {
+            const parts = [{ text: prompt }];
+            images.forEach((img, index) => {
+                if (img) {
+                    const label = index === 0 ? "A (or Reply Image)" : "B";
+                    parts.push({ text: `\n\n--- IMAGEN ${label} ---` }, { inlineData: { mimeType: img.type, data: img.data } });
+                }
+            });
+            
+            const payload = { contents: [{ role: "user", parts }], generationConfig: { responseMimeType: "application/json", responseSchema: schema } };
+            const apiKey = ""; // Canvas provides this
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            if (!response.ok) throw new Error(`La llamada a la API falló con el estado: ${response.status}`);
+            const result = await response.json();
+            if (result.candidates && result.candidates.length > 0) return JSON.parse(result.candidates[0].content.parts[0].text);
+            throw new Error("Estructura de respuesta inválida desde la API");
+        }
+        
+        // --- AUTH & FIREBASE LOGIC ---
+        function setupActivityTracker() {
+            if (!userId || !db) return;
+            document.getElementById('reset-activity-btn').disabled = false;
+            document.querySelectorAll('[data-activity]').forEach(btn => btn.disabled = false);
+            const today = new Date().toISOString().split('T')[0];
+            const docPath = `/artifacts/${appId}/users/${userId}/dailyActivity/${today}`;
+            activityDocRef = doc(db, docPath);
+
+            onSnapshot(activityDocRef, (doc) => {
+                const data = doc.data() || { tweets: 0, replies: 0, follows: 0, likes: 0 };
+                Object.keys(data).forEach(key => {
+                    const el = document.getElementById(`${key}-count`);
+                    if (el) el.textContent = data[key] || 0;
+                });
+            }, (error) => {
+                 console.error("Error al escuchar el documento de actividad:", error);
+                 setDoc(activityDocRef, { tweets: 0, replies: 0, follows: 0, likes: 0 });
+            });
+        }
+        
+        async function initializeFirebase() {
+            if (!firebaseConfig) {
+                console.error("La configuración de Firebase no está disponible.");
+                return;
+            }
+            const app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    console.log("Usuario autenticado:", userId);
+                    setupActivityTracker();
+                }
+            });
+            
+            if (auth.currentUser) {
+                userId = auth.currentUser.uid;
+                setupActivityTracker();
+                return;
+            };
+
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.warn(`Falló el inicio de sesión con token (${error.code}). Intentando inicio anónimo.`);
+                if (!auth.currentUser) {
+                    await signInAnonymously(auth).catch(e => console.error("El inicio de sesión anónimo también falló:", e));
+                }
+            }
+        }
+        
+        initializeFirebase();
+
+        // --- UI LOGIC ---
+        const generateBtn = document.getElementById('generate-btn');
+        const resultsContainer = document.getElementById('results-container');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const errorMessage = document.getElementById('error-message');
+        const adaptModal = document.getElementById('adapt-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        let currentContentToAdapt = '';
+
+        function setupButtonGroup(buttons, hiddenInputId) {
+            const input = document.getElementById(hiddenInputId);
+            buttons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    buttons.forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+                    const value = btn.dataset.context || btn.dataset.tone;
+                    input.value = value;
+                    
+                    if (hiddenInputId === 'selected-context') {
+                        ['reply-inputs', 'original-content-input', 'image-analysis-inputs'].forEach(id => document.getElementById(id).classList.add('hidden'));
+                        if (value === 'Reply') document.getElementById('reply-inputs').classList.remove('hidden');
+                        else if (value === 'Image Analysis') document.getElementById('image-analysis-inputs').classList.remove('hidden');
+                        else if(value) document.getElementById('original-content-input').classList.remove('hidden');
+                    }
+                });
+            });
+        }
+        setupButtonGroup(document.querySelectorAll('[data-context]'), 'selected-context');
+        setupButtonGroup(document.querySelectorAll('[data-tone]'), 'selected-tone');
+
+        document.querySelectorAll('.suggestion-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const replyAngleTextarea = document.getElementById('reply-angle');
+                replyAngleTextarea.value = btn.dataset.suggestion;
+                replyAngleTextarea.focus();
+                replyAngleTextarea.classList.add('ring-2', 'ring-blue-500');
+                setTimeout(() => replyAngleTextarea.classList.remove('ring-2', 'ring-blue-500'), 1500);
+            });
+        });
+
+        function handleImageUpload(inputId, boxId, previewContainerId, textId, stateKey) {
+            const input = document.getElementById(inputId);
+            const box = document.getElementById(boxId);
+            const previewContainer = document.getElementById(previewContainerId);
+            const textEl = document.getElementById(textId);
+            
+            input.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) processImageFile(file, previewContainer, textEl, stateKey);
+            });
+
+            box.addEventListener('paste', e => {
+                e.preventDefault();
+                const items = (e.clipboardData || window.clipboardData).items;
+                for (const item of items) {
+                    if (item.type.indexOf('image') !== -1) {
+                        const file = item.getAsFile();
+                        if (file) processImageFile(file, previewContainer, textEl, stateKey);
+                        return;
+                    }
+                }
+            });
+
+            previewContainer.querySelector('.delete-image-btn').addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                imageState[stateKey] = null;
+                input.value = '';
+                previewContainer.classList.add('hidden');
+                textEl.classList.remove('hidden');
+            });
+        }
+
+        function processImageFile(file, previewContainer, textEl, stateKey) {
+             const reader = new FileReader();
+             reader.onload = (event) => {
+                 const base64String = event.target.result.split(',')[1];
+                 imageState[stateKey] = { type: file.type, data: base64String };
+                 previewContainer.querySelector('.image-preview').src = event.target.result;
+                 previewContainer.classList.remove('hidden');
+                 textEl.classList.add('hidden');
+             };
+             reader.readAsDataURL(file);
+        }
+
+        handleImageUpload('image-a-input', 'image-a-box', 'image-a-preview-container', 'image-a-text', 'a');
+        handleImageUpload('image-b-input', 'image-b-box', 'image-b-preview-container', 'image-b-text', 'b');
+        handleImageUpload('reply-image-input', 'reply-image-box', 'reply-image-preview-container', 'reply-image-text', 'reply');
+        
+        document.querySelectorAll('[data-activity]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                if (!activityDocRef) return;
+                const key = btn.dataset.activity;
+                updateDoc(activityDocRef, { [key]: increment(1) })
+                    .catch(() => setDoc(activityDocRef, { [key]: 1 }, { merge: true }));
+            });
+        });
+
+        document.getElementById('reset-activity-btn').addEventListener('click', () => {
+             if (!activityDocRef) return;
+             setDoc(activityDocRef, { tweets: 0, replies: 0, follows: 0, likes: 0 });
+        });
+        
+        generateBtn.addEventListener('click', async () => {
+                const context = document.getElementById('selected-context').value;
+                const tone = document.getElementById('selected-tone').value;
+                let originalTweet = '', userAngle = '', originalIdea = '', imageQuestion = '', isValid = false;
+                
+                errorMessage.classList.add('hidden');
+
+                if (!context) { errorMessage.textContent = 'Por favor, selecciona un contexto primero.'; } 
+                else if (context === 'Reply') { originalTweet = document.getElementById('reply-to-tweet').value.trim(); if (originalTweet) isValid = true; else errorMessage.textContent = 'Por favor, pega el tweet original.'; } 
+                else if (context === 'Image Analysis') { imageQuestion = document.getElementById('image-question').value.trim(); if (imageQuestion && imageState.a && imageState.b) isValid = true; else errorMessage.textContent = 'Por favor, completa la pregunta y sube ambas imágenes.'; }
+                else { originalIdea = document.getElementById('original-idea').value.trim(); if (originalIdea) isValid = true; else errorMessage.textContent = 'Por favor, introduce tu idea principal.'; }
+                
+                if (!isValid) { errorMessage.classList.remove('hidden'); return; }
+
+                userAngle = (context === 'Reply') ? document.getElementById('reply-angle').value.trim() : (context === 'Image Analysis' ? document.getElementById('image-angle').value.trim() : '');
+                resultsContainer.innerHTML = '';
+                resultsContainer.classList.remove('visible');
+                loadingSpinner.style.display = 'flex';
+                generateBtn.disabled = true;
+                generateBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                
+                currentLanguage = detectLanguage(originalTweet || originalIdea || userAngle || imageQuestion);
+
+                try {
+                    const options = await generateInitialOptions(context, tone, {originalTweet, userAngle, originalIdea, imageQuestion});
+                    displayOptions(options, context);
+                    resultsContainer.classList.add('visible');
+                } catch (error) {
+                    console.error('Error generando contenido con IA:', error);
+                    errorMessage.textContent = 'Hubo un error al generar el contenido. Por favor, intenta de nuevo.';
+                    errorMessage.classList.remove('hidden');
+                } finally {
+                    loadingSpinner.style.display = 'none';
+                    generateBtn.disabled = false;
+                    generateBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
+            });
+
+            function displayOptions(options, context) {
+                const renderContent = (content) => (Array.isArray(content)) ? `<ol class="thread-list">${content.map((tweet, i) => `<li data-counter="${i + 1}/${content.length}">${tweet}</li>`).join('')}</ol>` : `<p class="text-gray-300 mb-4 whitespace-pre-wrap" data-main-content>${content}</p>`;
+                const getCopyText = (content) => Array.isArray(content) ? content.join('\n\n') : content;
+                
+                const createCard = (title, color, content, key) => `
+                    <div class="card" id="card-${key}">
+                        <h3 class="text-xl font-bold ${color} mb-3">${title}</h3>
+                        <div class="content-wrapper">${renderContent(content)}</div>
+                        <div class="analysis-box info-box hidden mt-4"></div>
+                        <div class="hashtags-box info-box hidden mt-4"></div>
+                        <div class="flex flex-wrap gap-2 mt-4">
+                            <button class="action-btn" onclick="window.analyzeContent('${key}')">🚀 Analizar</button>
+                            <button class="action-btn" onclick="window.suggestHashtags('${key}')">💡 Hashtags</button>
+                            <button class="action-btn" onclick="window.openAdaptModal('${key}')">🔄 Adaptar</button>
+                            <button class="copy-btn" onclick="copyToClipboard(this, \`${getCopyText(content).replace(/`/g, "'")}\`)">Copiar</button>
+                        </div>
+                    </div>`;
+
+                resultsContainer.innerHTML = `
+                    ${createCard('Opción 1: Directa y Técnica', 'text-blue-400', options.technical, 'technical')}
+                    ${createCard('Opción 2: Humana y Cercana', 'text-green-400', options.human, 'human')}
+                    ${createCard('Opción 3: Comunitaria y Pregunta', 'text-purple-400', options.community, 'community')}
+                    ${context !== 'Full Thread' && context !== 'Image Analysis' ? createCard('Opción 4: Directa y Concisa', 'text-amber-400', options.synthesized, 'synthesized') : ''}
+                `;
+            }
+            
+            closeModalBtn.addEventListener('click', () => adaptModal.classList.remove('visible'));
+            window.openAdaptModal = (key) => {
+                const card = document.getElementById(`card-${key}`);
+                currentContentToAdapt = (card.querySelector('[data-main-content]') || card.querySelector('.thread-list')).innerText;
+                document.getElementById('adapted-content-area').innerHTML = '';
+                adaptModal.classList.add('visible');
+            };
+
+            document.querySelectorAll('#adapt-modal .action-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const adaptedContentArea = document.getElementById('adapted-content-area');
+                    const modalLoader = document.getElementById('modal-loader');
+                    adaptedContentArea.innerHTML = '';
+                    modalLoader.classList.remove('hidden');
+                    try {
+                        const result = await adaptContent(currentContentToAdapt, btn.dataset.platform, currentLanguage);
+                        adaptedContentArea.innerHTML = result.adaptedContent;
+                    } catch (error) { adaptedContentArea.innerHTML = 'Error al adaptar el contenido.'; } 
+                    finally { modalLoader.classList.add('hidden'); }
+                });
+            });
+            
+            const createInfoBoxUpdater = (boxClass, apiCall) => async (key) => {
+                const card = document.getElementById(`card-${key}`);
+                const infoBox = card.querySelector(`.${boxClass}`);
+                infoBox.classList.remove('hidden');
+                infoBox.innerHTML = 'Procesando...';
+                const content = (card.querySelector('[data-main-content]') || card.querySelector('.thread-list')).innerText;
+                try { infoBox.innerHTML = await apiCall(content, currentLanguage); } 
+                catch (error) { infoBox.innerHTML = `No se pudo obtener la información.`; }
+            };
+
+            window.analyzeContent = createInfoBoxUpdater('analysis-box', async (content, lang) => {
+                const result = await getAnalysis(content, lang);
+                return `<strong>Puntaje: ${result.score}/10</strong><br>${result.reasoning}`;
+            });
+
+            window.suggestHashtags = createInfoBoxUpdater('hashtags-box', async (content, lang) => {
+                const result = await getHashtags(content, lang);
+                return `<strong>Sugerencias:</strong><br>${result.hashtags.join(' ')}`;
+            });
+            
+            async function generateInitialOptions(context, tone, inputs) {
+                const { originalTweet, userAngle, originalIdea, imageQuestion } = inputs;
+                const isThread = context === 'Full Thread';
+                const isImageAnalysis = context === 'Image Analysis';
+                const isReplyWithImage = context === 'Reply' && imageState.reply;
+                
+                const propertySchema = isThread ? { type: "ARRAY", items: { type: "STRING" } } : { type: "STRING" };
+                const requiredFields = ["technical", "human", "community"];
+                if (!isThread && !isImageAnalysis) requiredFields.push("synthesized");
+                const responseSchema = { type: "OBJECT", properties: { technical: propertySchema, human: propertySchema, community: propertySchema }, required: requiredFields };
+                if (!isThread && !isImageAnalysis) responseSchema.properties.synthesized = { type: "STRING" };
+                
+                let userInput = `My Angle: "${userAngle}"`;
+                if (isImageAnalysis) userInput = `Original Tweet's Question: "${imageQuestion}", ${userInput}`;
+                else if(isReplyWithImage) userInput = `Original Tweet's Text: "${originalTweet}", ${userInput}`;
+                else userInput = `My Original Idea: "${originalIdea || originalTweet}", ${userInput}`;
+
+                const prompt = `You are an AI assistant for a startup founder. Your persona is "The Insightful Founder-Designer". Your core tone is always knowledgeable, transparent, collaborative, and passionate. NEVER lose the human factor. **The output text MUST be in ${currentLanguage}.**
+                    **Core Instruction:** Your primary goal is to be a creative partner. 
+                    - For a "Reply", your task is to generate a response FROM the user TO the original tweet text provided. The user's angle is optional additional context for you to weave into the reply. Do not get confused and develop the original tweet's text as if it were the user's idea. You are REPLYING to it.
+                    - If the user provides a detailed structure (like for a thread), your absolute priority is to follow that structure. Use the user's text and ideas as the foundation and enhance them with the selected tone. DO NOT replace their detailed plan.
+                    - **Nuance Detection:** Pay close attention to the user's input. If it seems like a meme, a joke, or is sarcastic (like "What's stopping you from...?" with an image of messy code), your generated responses should reflect an understanding of this nuance. Don't be overly literal.
+                    **Your Task:** Generate tweet options for the specific situation below.
+                    **Tone Emphasis:** ${tone}
+                    **The Situation:** Context: ${context}, User Input: ${userInput}.
+                    ${isImageAnalysis || isReplyWithImage ? 'The user has provided an image (or two) for analysis. Your response MUST incorporate insights from analyzing the image(s).' : ''}
+                    **Your Output:** You must generate a JSON object matching the provided schema.
+                    ${isImageAnalysis ? 'For each key, provide a single string giving expert feedback comparing Image A and Image B.' 
+                    : isReplyWithImage ? 'For each key, provide a single string that replies to the original tweet, incorporating your analysis of the provided image.'
+                    : isThread ? `For each key ("technical", "human", "community"), provide an array of 5 strings for a thread.` 
+                    : `For keys ("technical", "human", "community", "synthesized"), provide a single string. "synthesized" must be a 1-2 line summary.`}
+                    Do not include any explanation, just the raw JSON object.`;
+                
+                const images = isImageAnalysis ? [imageState.a, imageState.b] : [imageState.reply, null];
+                return await callGenerativeAI(prompt, responseSchema, images);
+            }
+
+            async function getAnalysis(content, language) {
+                const prompt = `You are a social media expert. Analyze the following content and give it a potential engagement score from 1 to 10. Briefly explain your reasoning in ${language}. Content: "${content}". Output JSON with "score" (number) and "reasoning" (string).`;
+                const schema = { type: "OBJECT", properties: { score: { type: "NUMBER" }, reasoning: { type: "STRING" } }, required: ["score", "reasoning"] };
+                return await callGenerativeAI(prompt, schema, []);
+            }
+
+            async function getHashtags(content, language) {
+                const prompt = `You are a social media expert. Based on the following content, suggest 5-7 relevant hashtags in ${language}. Content: "${content}". Output JSON with a "hashtags" array of strings.`;
+                const schema = { type: "OBJECT", properties: { hashtags: { type: "ARRAY", items: { type: "STRING" } } }, required: ["hashtags"] };
+                return await callGenerativeAI(prompt, schema, []);
+            }
+
+            async function adaptContent(content, platform, language) {
+                const prompt = `You are a content marketing expert. Take the following content and adapt it for the specified platform in ${language}. Original Content: "${content}", Platform: ${platform}. Output JSON with one key: "adaptedContent" (string).`;
+                const schema = { type: "OBJECT", properties: { adaptedContent: { type: "STRING" } }, required: ["adaptedContent"] };
+                return await callGenerativeAI(prompt, schema, []);
+            }
+    </script>
+</body>
+</html>
